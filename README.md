@@ -1,1 +1,184 @@
-# Btcusd-1.19-08.34.44
+
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Painel Automático BTC - Tempo/Preço</title>
+    <style>
+        body {
+            background-color: #0b0e11;
+            color: #eaecef;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 10px;
+        }
+        .painel {
+            max-width: 360px;
+            background: #181a20;
+            border: 1px solid #2b313a;
+            border-radius: 10px;
+            padding: 16px;
+            margin: 0 auto;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .titulo {
+            font-size: 15px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 12px;
+            color: #fcd535;
+        }
+        .linha {
+            font-size: 13px;
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #222;
+            padding-bottom: 8px;
+        }
+        .destaque {
+            font-weight: bold;
+            color: #fcd535;
+        }
+        .valor-tempo {
+            text-align: right;
+        }
+        .preco-bloco {
+            font-weight: bold;
+        }
+        .hora-bloco {
+            font-size: 12px;
+            color: #0ecb81;
+        }
+        .alerta {
+            margin-top: 15px;
+            padding: 12px;
+            text-align: center;
+            font-weight: bold;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .comprar { background-color: #0ecb81; color: #000; }
+        .vender { background-color: #f6465d; color: #fff; }
+    </style>
+</head>
+<body>
+
+<div class="painel">
+    <div class="titulo" id="tituloTopo">BTCUSD - 1:19 - 8:34</div>
+    
+    <div class="linha">
+        <span>Preço Atual:</span>
+        <strong id="precoBtc" class="destaque">Buscando...</strong>
+    </div>
+
+    <div class="linha">
+        <span>Hora Local:</span>
+        <strong id="horaLocal" style="color: #0ecb81;">--:--:--</strong>
+    </div>
+    
+    <!-- MÁXIMA NO TOPO -->
+    <div class="linha">
+        <span style="color: #f6465d; font-weight: bold;">Máxima (Alvo):</span>
+        <div class="valor-tempo">
+            <div id="valMaxima" class="preco-bloco">--</div>
+            <div id="horaMaxima" class="hora-bloco">--</div>
+        </div>
+    </div>
+
+    <!-- PONTO MÉDIO NO CENTRO -->
+    <div class="linha">
+        <span style="color: #fcd535; font-weight: bold;">Ponto Médio:</span>
+        <div class="valor-tempo">
+            <div id="valMeio" class="preco-bloco">--</div>
+            <div id="horaMeio" class="hora-bloco">--</div>
+        </div>
+    </div>
+
+    <!-- MÍNIMA EMBAIXO -->
+    <div class="linha">
+        <span style="color: #0ecb81; font-weight: bold;">Mínima (Base):</span>
+        <div class="valor-tempo">
+            <div id="valMinima" class="preco-bloco">--</div>
+            <div id="horaMinima" class="hora-bloco">--</div>
+        </div>
+    </div>
+
+    <div id="caixaAlerta" class="alerta comprar">
+        Analisando mercado...
+    </div>
+</div>
+
+<script>
+function formatarTempo(totalSegundos) {
+    let min = Math.floor(totalSegundos / 60);
+    let seg = totalSegundos % 60;
+    return `${min}:${seg < 10 ? '0' : ''}${seg}`;
+}
+
+async function calcularPainelAutomatico() {
+    try {
+        let resposta = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
+        let dados = await resposta.json();
+        let precoDolar = parseFloat(dados.price);
+        let precoFormatado = precoDolar.toFixed(2);
+        
+        document.getElementById("precoBtc").innerText = "$" + precoFormatado;
+
+        // Casa do milhar atual (ex: 79)
+        let milhar = Math.floor(precoDolar / 1000);
+        
+        // Mínima (Base redonda do milhar + offset fixo)
+        let minimaPreco = milhar * 1000 + 119; 
+        let minSegundosBase = (1 * 60) + 19; // 1:19
+
+        // Máxima (Soma a proporção das centenas, ex: 444)
+        let centenasOffset = 444; 
+        let maximaPreco = minimaPreco + centenasOffset + 271; 
+        let maxSegundosBase = (8 * 60) + 34; // 8:34
+
+        // Ponto Médio
+        let pontoMedio = (minimaPreco + maximaPreco) / 2;
+        let meioSegundosBase = (minSegundosBase + maxSegundosBase) / 2;
+
+        // Atualiza os valores na tela
+        document.getElementById("valMinima").innerText = "$" + minimaPreco.toFixed(2);
+        document.getElementById("horaMinima").innerText = formatarTempo(minSegundosBase);
+
+        document.getElementById("valMeio").innerText = "$" + pontoMedio.toFixed(2);
+        document.getElementById("horaMeio").innerText = formatarTempo(Math.floor(meioSegundosBase));
+
+        document.getElementById("valMaxima").innerText = "$" + maximaPreco.toFixed(2);
+        document.getElementById("horaMaxima").innerText = formatarTempo(maxSegundosBase);
+
+        // Atualiza o título dinâmico no topo
+        document.getElementById("tituloTopo").innerText = `BTCUSD - 1:${minSegundosBase % 60 < 10 ? '0':''}${minSegundosBase % 60} - 8:34`;
+
+        // Hora local
+        let agora = new Date();
+        document.getElementById("horaLocal").innerText = agora.toLocaleTimeString('pt-BR');
+
+        // Sinal de Compra ou Venda pelo último dígito
+        let ultimoDigito = parseInt(precoFormatado.slice(-1));
+        let caixaAlerta = document.getElementById("caixaAlerta");
+
+        if (ultimoDigito % 2 === 0) {
+            caixaAlerta.className = "alerta comprar";
+            caixaAlerta.innerHTML = "🟢 COMPRA (Média Alta)";
+        } else {
+            caixaAlerta.className = "alerta vender";
+            caixaAlerta.innerHTML = "🔴 VENDA (Média Baixa)";
+        }
+
+    } catch (e) {
+        document.getElementById("precoBtc").innerText = "Erro na conexão";
+    }
+}
+
+// Atualiza sozinho a cada 10 segundos
+setInterval(calcularPainelAutomatico, 10000);
+calcularPainelAutomatico();
+</script>
+
+</body>
+</html>
